@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { JumboResponseDto } from './common/dto/jumboResponse.dto';
 import * as uuid from 'uuid';
+import { Logo } from './enums/logo.enum';
+import { Store } from './enums/store.enum';
 @Injectable()
 export class AppService {
   async getProducts(queryProduct: string) {
+    if (queryProduct === '') {
+      return [];
+    }
+
     queryProduct = queryProduct.replaceAll('.', '').toLowerCase();
     const jumboProducts = await this.getJumboProducts(queryProduct);
     const carrefourProducts = await this.getCarrefourProducts(queryProduct);
@@ -18,19 +24,6 @@ export class AppService {
       ...comodinProducts,
     ];
 
-    // const filteredResults = results.reduce((acc, item) => {
-    //   const ean = item.ean;
-    //   if (!acc[ean]) {
-    //     acc[ean] = [];
-    //   }
-    //   acc[ean].push(item);
-    //   return acc;
-    // }, {});
-
-    // filteredResults = Object.values(filteredResults).sort(
-    //   (a: [], b: []) => b.length - a.length,
-    // );
-
     return results;
   }
 
@@ -41,7 +34,7 @@ export class AppService {
 
     let data = await response.json();
 
-    data = data.contents[0].Main[1].contents[0].records;
+    data = data.contents[0].Main[0].contents[0].records;
 
     data = data.map((item) => {
       return {
@@ -73,8 +66,7 @@ export class AppService {
       const seller = {
         sellerName,
         ofertas: [],
-        sellerLogo:
-          'https://static.cotodigital3.com.ar/sitios/cdigi/static/content/images/nuevositio/header/LogoCOTO.svg',
+        sellerLogo: Logo.Coto,
       };
       const id = uuid.v4();
       return {
@@ -82,8 +74,8 @@ export class AppService {
         name,
         ean,
         images,
-        ListPrice,
-        Price: ListPrice,
+        ListPrice: parseFloat(ListPrice).toFixed(2),
+        Price: parseFloat(ListPrice).toFixed(2),
         seller,
       };
     });
@@ -92,171 +84,39 @@ export class AppService {
   }
 
   private async getCarrefourProducts(queryProduct: string) {
-    const data = await this.getData(
-      'https://www.carrefour.com.ar',
-      queryProduct,
-    );
-
-    let queryData = data.queryData;
-    if (queryData) {
-      queryData = queryData.map((element) => {
-        return JSON.parse(element.data);
-      });
-
-      const productSearch = queryData[0].productSearch;
-
-      let products = productSearch.products.map((product) => {
-        return {
-          ...product.items,
-        };
-      });
-
-      products = productSearch.products.map((product) => {
-        return { ...product };
-      });
-
-      products = productSearch.products.map((product) => {
-        return product.items[0];
-      });
-
-      products = productSearch.products.map((product) => {
-        const { name, ean, sellers } = product.items[0];
-        let { images } = product.items[0];
-        images = images[0].imageUrl;
-
-        const { sellerName, commertialOffer } = sellers[0];
-        const { teasers, Price, ListPrice } = commertialOffer;
-        const ofertas = [];
-
-        teasers.forEach((teaser) => {
-          if (!teaser.name.toLowerCase().includes('tarjeta')) {
-            ofertas.push(teaser);
-          }
-        });
-        const id = uuid.v4();
-
-        const seller = {
-          sellerName,
-          ofertas,
-          sellerLogo:
-            'https://carrefourar.vtexassets.com/assets/vtex/assets-builder/carrefourar.theme/78.3.0/logo/logo___8ebc4231614a7b41a4258354ce76e1e1.svg',
-        };
-
-        return { id, name, ean, images, seller, Price, ListPrice };
-      });
+    try {
+      const data = await this.getData(
+        'https://www.carrefour.com.ar',
+        queryProduct,
+      );
+      const products = this.formatDataCVJ(data, Store.Carrefour);
       return products;
+    } catch (error) {
+      console.log(error.message);
+      return [];
     }
-    return [];
   }
 
   private async getJumboProducts(queryProduct: string) {
-    const data = await this.getData('https://www.jumbo.com.ar', queryProduct);
-
-    let queryData = data.queryData;
-    if (queryData) {
-      queryData = queryData.map((element) => {
-        return JSON.parse(element.data);
-      });
-
-      const productSearch = queryData[0].productSearch;
-
-      let products = productSearch.products.map((product) => {
-        return {
-          ...product.items,
-        };
-      });
-
-      products = productSearch.products.map((product) => {
-        return { ...product };
-      });
-
-      products = productSearch.products.map((product) => {
-        return product.items[0];
-      });
-
-      products = productSearch.products.map((product) => {
-        const { name, ean, sellers } = product.items[0];
-        let { images } = product.items[0];
-        images = images[0].imageUrl;
-
-        const { sellerName, commertialOffer } = sellers[0];
-        const { teasers, Price, ListPrice } = commertialOffer;
-        const ofertas = [];
-
-        teasers.forEach((teaser) => {
-          if (!teaser.name.toLowerCase().includes('tarjeta')) {
-            ofertas.push(teaser);
-          }
-        });
-        const id = uuid.v4();
-
-        const seller = {
-          sellerName,
-          sellerLogo:
-            'https://jumboargentinaio.vtexassets.com/assets/vtex/assets-builder/jumboargentinaio.store-theme/4.0.55/img/logo-jumbo___298a91c7745ef5319749159e7332eec5.svg',
-          ofertas,
-        };
-
-        return { id, name, ean, images, seller, Price, ListPrice };
-      });
+    try {
+      const data = await this.getData('https://www.jumbo.com.ar', queryProduct);
+      const products = this.formatDataCVJ(data, Store.Jumbo);
       return products;
+    } catch (error) {
+      console.log(error.message);
+      return [];
     }
-    return [];
   }
 
   private async getVeaProducts(queryProduct: string) {
-    const data = await this.getData('https://www.vea.com.ar', queryProduct);
-
-    let queryData = data.queryData;
-    if (queryData) {
-      queryData = queryData.map((element) => {
-        return JSON.parse(element.data);
-      });
-
-      const productSearch = queryData[0].productSearch;
-
-      let products = productSearch.products.map((product) => {
-        return {
-          ...product.items,
-        };
-      });
-
-      products = productSearch.products.map((product) => {
-        return { ...product };
-      });
-
-      products = productSearch.products.map((product) => {
-        return product.items[0];
-      });
-
-      products = productSearch.products.map((product) => {
-        const { name, ean, sellers } = product.items[0];
-        let { images } = product.items[0];
-        images = images[0].imageUrl;
-
-        const { sellerName, commertialOffer } = sellers[0];
-        const { teasers, Price, ListPrice } = commertialOffer;
-        const ofertas = [];
-
-        teasers.forEach((teaser) => {
-          if (!teaser.name.toLowerCase().includes('tarjeta')) {
-            ofertas.push(teaser);
-          }
-        });
-        const id = uuid.v4();
-
-        const seller = {
-          sellerName,
-          ofertas,
-          sellerLogo:
-            'https://veaargentina.vtexassets.com/assets/vtex.file-manager-graphql/images/90afb408-ae59-49dc-93d3-024dfad89cb3___512e889dc7a3dba0a62a4b47dffde6d1.png',
-        };
-
-        return { id, name, ean, images, seller, Price, ListPrice };
-      });
+    try {
+      const data = await this.getData('https://www.vea.com.ar', queryProduct);
+      const products = this.formatDataCVJ(data, Store.Vea);
       return products;
+    } catch (error) {
+      console.log(error.message);
+      return [];
     }
-    return [];
   }
 
   private async getComodinProducts(queryProduct: string) {
@@ -281,8 +141,7 @@ export class AppService {
       const seller = {
         sellerName,
         ofertas: Teasers,
-        sellerLogo:
-          'http://supermercadoscomodin.com/wp-content/uploads/2019/06/logo-COMODIN-1-1.png',
+        sellerLogo: Logo.Comodin,
       };
       return { id, name, ean, images, seller, Price, ListPrice };
     });
@@ -294,9 +153,63 @@ export class AppService {
     const appsEtag = `appsEtag%2Cblocks%2CblocksTree%2Ccomponents%2CcontentMap%2Cextensions%2Cmessages%2Cpage%2Cpages%2Cquery%2CqueryData%2Croute%2CruntimeMeta%2Csettings`;
     const map = `ft`;
     const search = encodeURIComponent(queryProduct);
-    const url = `${urlShop}/${search}?_q=${search}&_map=${map}&__pickRuntime=${appsEtag}`;
+    const url = `${urlShop}/${search}?_q=${search}&map=${map}&__pickRuntime=${appsEtag}`;
+    console.log(url);
     const response = await fetch(url);
     const data = await response.json();
     return data;
+  }
+
+  private formatDataCVJ(data, shop: string) {
+    let queryData = data.queryData;
+    if (queryData) {
+      queryData = queryData.map((element) => {
+        return JSON.parse(element.data);
+      });
+
+      const productSearch = queryData[0].productSearch;
+
+      let products = productSearch.products.map((product) => {
+        return {
+          ...product.items,
+        };
+      });
+
+      products = productSearch.products.map((product) => {
+        return { ...product };
+      });
+
+      products = productSearch.products.map((product) => {
+        return product.items[0];
+      });
+
+      //console.log(products);
+      products = productSearch.products.map((product) => {
+        const { name, ean, sellers } = product.items[0];
+        let { images } = product.items[0];
+        images = images[0].imageUrl;
+
+        const { sellerName, commertialOffer } = sellers[0];
+        const { teasers, Price, ListPrice } = commertialOffer;
+        const ofertas = [];
+
+        teasers.forEach((teaser) => {
+          if (!teaser.name.toLowerCase().includes('tarjeta')) {
+            ofertas.push(teaser);
+          }
+        });
+        const id = uuid.v4();
+
+        const seller = {
+          sellerName,
+          ofertas,
+          sellerLogo: Logo[shop],
+        };
+
+        return { id, name, ean, images, seller, Price, ListPrice };
+      });
+      return products;
+    }
+    return [];
   }
 }
