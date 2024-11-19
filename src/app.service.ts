@@ -11,17 +11,20 @@ export class AppService {
       return [];
     }
     queryProduct = queryProduct.replaceAll('.', '').toLowerCase();
-    const jumboProducts = await this.getJumboProducts(queryProduct);
-    const carrefourProducts = await this.getCarrefourProducts(queryProduct);
-    const veaProducts = await this.getVeaProducts(queryProduct);
     const comodinProducts = await this.getComodinProducts(queryProduct);
+    const carrefourProducts = await this.getCarrefourProducts(queryProduct);
+    const jumboProducts = await this.getJumboProducts(queryProduct);
+    const veaProducts = await this.getVeaProducts(queryProduct);
     const cotoProudcts = await this.getCotoProducts(queryProduct);
+    const diaProducts = await this.getDiaProducts(queryProduct);
+
     const results: JumboResponseDto[] = [
       ...carrefourProducts,
+      ...veaProducts,
+      ...diaProducts,
+      ...comodinProducts,
       ...cotoProudcts,
       ...jumboProducts,
-      ...veaProducts,
-      ...comodinProducts,
     ];
 
     return results;
@@ -126,6 +129,20 @@ export class AppService {
     try {
       const data = await this.getData('https://www.vea.com.ar', queryProduct);
       const products = this.formatDataCVJ(data, Store.Vea);
+      return products;
+    } catch (error) {
+      console.log(error.message);
+      return [];
+    }
+  }
+
+  private async getDiaProducts(queryProduct: string) {
+    try {
+      const data = await this.getData(
+        'https://diaonline.supermercadosdia.com.ar',
+        queryProduct,
+      );
+      const products = this.formatDataCVJ(data, Store.Dia);
       return products;
     } catch (error) {
       console.log(error.message);

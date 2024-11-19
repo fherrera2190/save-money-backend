@@ -4,4 +4,5 @@ export enum Store {
   Vea = 'Vea',
   Comodin = 'Comodin',
   Coto = 'Coto',
+  Dia = 'Dia',
 }
