@@ -3,13 +3,13 @@ import { JumboResponseDto } from './common/dto/jumboResponse.dto';
 import * as uuid from 'uuid';
 import { Logo } from './enums/logo.enum';
 import { Store } from './enums/store.enum';
+
 @Injectable()
 export class AppService {
   async getProducts(queryProduct: string) {
     if (queryProduct === '') {
       return [];
     }
-
     queryProduct = queryProduct.replaceAll('.', '').toLowerCase();
     const jumboProducts = await this.getJumboProducts(queryProduct);
     const carrefourProducts = await this.getCarrefourProducts(queryProduct);
@@ -28,59 +28,73 @@ export class AppService {
   }
 
   private async getCotoProducts(queryProduct: string) {
-    const nnt = encodeURIComponent(queryProduct);
-    const url = `https://api.cotodigital.com.ar/sitios/cdigi/categoria?Ntt=${nnt}&format=json`;
-    const response = await fetch(url);
+    let data = null;
+    try {
+      const nnt = encodeURIComponent(queryProduct);
+      const url = `https://api.cotodigital.com.ar/sitios/cdigi/categoria?Ntt=${nnt}&format=json`;
+      const response = await fetch(url);
+      data = await response.json();
 
-    let data = await response.json();
-
-    data = data.contents[0].Main[0].contents[0].records;
-
-    data = data.map((item) => {
-      return {
-        ...item.records[0].attributes,
-      };
-    });
-
-    let products = [];
-
-    data.forEach((object) => {
-      const newProduct = {};
-      for (const key in object) {
-        if (Object.prototype.hasOwnProperty.call(object, key)) {
-          newProduct[key.split('.')[1] + ''] = object[key][0];
+      let valueData = 0;
+      let findValue = false;
+      while (!findValue) {
+        if (data.contents[0].Main[valueData].contents) {
+          findValue = true;
+        } else {
+          valueData++;
         }
       }
-      products.push(newProduct);
-    });
+      data = data.contents[0].Main[valueData].contents[0].records;
 
-    products = products.map((product) => {
-      const {
-        description: name,
-        eanPrincipal: ean,
-        largeImage: images,
-        activePrice: ListPrice,
-        siteId: sellerName,
-      } = product;
+      data = data.map((item) => {
+        return {
+          ...item.records[0].attributes,
+        };
+      });
 
-      const seller = {
-        sellerName,
-        ofertas: [],
-        sellerLogo: Logo.Coto,
-      };
-      const id = uuid.v4();
-      return {
-        id,
-        name,
-        ean,
-        images,
-        ListPrice: parseFloat(ListPrice).toFixed(2),
-        Price: parseFloat(ListPrice).toFixed(2),
-        seller,
-      };
-    });
+      let products = [];
 
-    return products;
+      data.forEach((object) => {
+        const newProduct = {};
+        for (const key in object) {
+          if (Object.prototype.hasOwnProperty.call(object, key)) {
+            newProduct[key.split('.')[1] + ''] = object[key][0];
+          }
+        }
+        products.push(newProduct);
+      });
+
+      products = products.map((product) => {
+        const {
+          description: name,
+          eanPrincipal: ean,
+          largeImage: images,
+          activePrice: ListPrice,
+          siteId: sellerName,
+        } = product;
+
+        const seller = {
+          sellerName,
+          ofertas: [],
+          sellerLogo: Logo.Coto,
+        };
+        const id = uuid.v4();
+        return {
+          id,
+          name,
+          ean,
+          images,
+          ListPrice: parseFloat(ListPrice).toFixed(2),
+          Price: parseFloat(ListPrice).toFixed(2),
+          seller,
+        };
+      });
+
+      return products;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   }
 
   private async getCarrefourProducts(queryProduct: string) {
@@ -120,33 +134,38 @@ export class AppService {
   }
 
   private async getComodinProducts(queryProduct: string) {
-    const busqueda = encodeURIComponent(queryProduct);
-    const url = `https://www.comodinencasa.com.ar/api/catalog_system/pub/products/search/busca?O=OrderByTopSaleDESC&ft=${busqueda}`;
+    try {
+      const busqueda = encodeURIComponent(queryProduct);
+      const url = `https://www.comodinencasa.com.ar/api/catalog_system/pub/products/search/busca?O=OrderByTopSaleDESC&ft=${busqueda}`;
 
-    const response = await fetch(url);
-    let products = await response.json();
+      const response = await fetch(url);
+      let products = await response.json();
 
-    products = products.map((product) => {
-      return product.items[0];
-    });
+      products = products.map((product) => {
+        return product.items[0];
+      });
 
-    products = products.map((product) => {
-      const { name, ean, sellers } = product;
-      let { images } = product;
-      const { sellerName, commertialOffer } = sellers[0];
-      const { Teasers = [], Price, ListPrice } = commertialOffer;
-      const id = uuid.v4();
+      products = products.map((product) => {
+        const { name, ean, sellers } = product;
+        let { images } = product;
+        const { sellerName, commertialOffer } = sellers[0];
+        const { Teasers = [], Price, ListPrice } = commertialOffer;
+        const id = uuid.v4();
 
-      images = images[0].imageUrl;
-      const seller = {
-        sellerName,
-        ofertas: Teasers,
-        sellerLogo: Logo.Comodin,
-      };
-      return { id, name, ean, images, seller, Price, ListPrice };
-    });
+        images = images[0].imageUrl;
+        const seller = {
+          sellerName,
+          ofertas: Teasers,
+          sellerLogo: Logo.Comodin,
+        };
+        return { id, name, ean, images, seller, Price, ListPrice };
+      });
 
-    return products;
+      return products;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   }
 
   private async getData(urlShop: string, queryProduct: string) {
